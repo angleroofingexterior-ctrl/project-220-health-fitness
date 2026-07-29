@@ -1,8 +1,19 @@
-const CACHE_NAME = "project-220-v2";
+const CACHE_NAME = "project-220-v3";
 const APP_SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon.svg"];
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
+  event.waitUntil(
+    caches.open(CACHE_NAME).then(async (cache) => {
+      await cache.addAll(APP_SHELL);
+      const response = await fetch("./index.html", { cache: "reload" });
+      const html = await response.clone().text();
+      const assets = [...html.matchAll(/(?:src|href)="([^"]+)"/g)]
+        .map((match) => match[1])
+        .filter((path) => path.startsWith("./assets/"));
+      await cache.put("./index.html", response);
+      if (assets.length) await cache.addAll(assets);
+    }),
+  );
   self.skipWaiting();
 });
 
