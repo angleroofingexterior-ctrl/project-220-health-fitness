@@ -1,0 +1,19 @@
+{
+  "name": "Project 220 Health & Fitness",
+  "short_name": "Project 220",
+  "description": "Personal workout, nutrition, grocery, recovery, and progress planning.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#f3f1eb",
+  "theme_color": "#7e1715",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "./og.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
