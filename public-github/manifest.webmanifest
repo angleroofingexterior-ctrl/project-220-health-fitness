@@ -1,7 +1,7 @@
 {
   "name": "Project 220 Health & Fitness",
   "short_name": "Project 220",
-  "description": "Personal workout, nutrition, grocery, recovery, and progress planning.",
+  "description": "Personal workouts, meal plans, measured recipes, grocery lists, routines, reminders, and progress logs.",
   "start_url": ".",
   "scope": ".",
   "display": "standalone",
@@ -10,7 +10,7 @@
   "orientation": "any",
   "icons": [
     {
-      "src": "./og.svg",
+      "src": "./icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"

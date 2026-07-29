@@ -1,17 +1,24 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
+  buildCookbook,
   buildDailyTasks,
   buildGroceries,
   buildMeals,
+  buildRoutineWeek,
   buildWorkoutWeek,
   defaultProfile,
   displayWeight,
   estimateCalories,
+  foodCatalog,
+  foodIsCompatible,
+  genderOptions,
   planWarnings,
   proteinTarget,
+  routineActivityCatalog,
   type PlannedGrocery,
+  type RecipeIngredient,
   type UserProfile,
   weightUnit,
 } from "./planner";
@@ -21,11 +28,24 @@ type Section =
   | "today"
   | "training"
   | "nutrition"
+  | "cookbook"
   | "grocery"
   | "supplements"
   | "progress"
-  | "routine";
+  | "routine"
+  | "install";
 type CheckMap = Record<string, boolean>;
+type InstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+};
+type WeightEntry = {
+  id: string;
+  date: string;
+  weightKg: number;
+  note?: string;
+  photoDataUrl?: string;
+};
 type ExerciseGuide = {
   why: string;
   muscles: string;
@@ -47,10 +67,42 @@ const navItems: Array<{ id: Section; label: string; short: string }> = [
   { id: "today", label: "Today", short: "T" },
   { id: "training", label: "Training", short: "W" },
   { id: "nutrition", label: "Diet Plan", short: "D" },
+  { id: "cookbook", label: "Cookbook", short: "C" },
   { id: "grocery", label: "Groceries", short: "G" },
   { id: "supplements", label: "Supplements", short: "S" },
   { id: "progress", label: "Progress", short: "P" },
   { id: "routine", label: "Routine", short: "R" },
+  { id: "install", label: "Install", short: "I" },
+];
+
+const supplementOptions = [
+  { id: "protein-powder", name: "Protein powder", use: "Convenient protein when meals fall short", timing: "Any time that helps meet the daily protein plan", amount: "Use the product label and include it in daily totals", review: "Check allergens and look for an NPN in Canada" },
+  { id: "mass-gainer", name: "Mass gainer", use: "Extra calories and protein for people who struggle to eat enough", timing: "Between meals or around training if tolerated", amount: "Start with the label serving or a partial serving", review: "Count it as food; check sugar, allergens, and digestive tolerance" },
+  { id: "creatine", name: "Creatine monohydrate", use: "Supports repeated high-intensity efforts and training quality", timing: "Any consistent time, including rest days", amount: "Common healthy-adult maintenance: 3-5 g daily", review: "Professional review for minors, pregnancy, kidney disease, medications, or fluid restrictions" },
+  { id: "multivitamin", name: "Multivitamin", use: "May cover identified dietary gaps; it is not a muscle builder", timing: "With a meal if the label or clinician recommends it", amount: "One label-directed serving only", review: "Avoid stacking overlapping formulas" },
+  { id: "vitamin-d", name: "Vitamin D", use: "Supports normal bone, muscle, and immune function", timing: "As directed on the product or by a clinician", amount: "Do not auto-dose; needs vary", review: "Discuss blood work, medications, and other fortified products" },
+  { id: "vitamin-b12", name: "Vitamin B12", use: "Supports normal red-blood-cell formation and nerve function", timing: "As directed; especially relevant to some vegan diets or absorption conditions", amount: "Do not auto-dose", review: "Confirm need and product strength with a pharmacist or clinician" },
+  { id: "iron", name: "Iron", use: "Treats or prevents iron deficiency only when appropriate", timing: "Only as professionally directed because foods and medications can affect absorption", amount: "No automatic dose", review: "Do not take routinely without confirmed need; excess can be harmful" },
+  { id: "calcium", name: "Calcium", use: "Supports bone and muscle function when food intake is insufficient", timing: "Product- and medication-dependent", amount: "No automatic dose", review: "Food first; check medication spacing and total daily intake" },
+  { id: "magnesium", name: "Magnesium", use: "Supports normal muscle, nerve, and energy metabolism", timing: "Follow the selected product label", amount: "No automatic dose", review: "Some forms cause diarrhea and can interact with medications" },
+  { id: "omega3", name: "Omega-3", use: "May help meet omega-3 needs when fish intake is low", timing: "With food if used", amount: "Follow the label or clinician advice", review: "Check fish/shellfish source, allergies, and blood-thinning medicines" },
+  { id: "electrolytes", name: "Electrolyte / oral rehydration product", use: "Replaces sodium and fluid in a specific heat, endurance, illness, or medical situation", timing: "When the situation calls for it", amount: "Use the label or clinical plan", review: "Not a universal daily requirement; kidney/heart conditions need guidance" },
+  { id: "fibre", name: "Fibre supplement", use: "May support bowel regularity when appropriate", timing: "Separate from some medicines and increase gradually", amount: "Use the label and adequate fluid", review: "Ostomy, narrowing, swallowing difficulty, or digestive disease require professional review" },
+  { id: "probiotic", name: "Probiotic", use: "Some specific strains may help specific conditions", timing: "Depends on the exact product", amount: "Follow the exact product label", review: "Benefits are strain-specific; not automatically needed" },
+] as const;
+
+const weekDays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const motivationQuotes = [
+  "Show up for the person you are becoming.",
+  "Controlled reps today become strength tomorrow.",
+  "Progress is built one good choice at a time.",
+  "You do not need perfect conditions - you need the next useful action.",
+  "Strong bodies grow from patient, repeatable work.",
+  "Your pace is valid. Keep moving forward.",
+  "Fuel the work, respect recovery, and trust the trend.",
+  "Every well-performed rep is a vote for your future health.",
+  "Consistency is a skill, and you are practising it now.",
+  "Finish with good form and leave something to build on.",
 ];
 
 const supplementCards = [
@@ -359,13 +411,23 @@ const currentDay = () => {
 function useStoredState<T>(key: string, initial: T) {
   const [value, setValue] = useState<T>(initial);
   const [ready, setReady] = useState(false);
+  const initialRef = useRef(initial);
 
   useEffect(() => {
     try {
       const stored = window.localStorage.getItem(key);
-      // Restore the saved device state after hydration.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      if (stored) setValue(JSON.parse(stored) as T);
+      if (stored) {
+        const parsed = JSON.parse(stored) as T;
+        const merged = (
+          initialRef.current !== null
+          && parsed !== null
+          && typeof initialRef.current === "object"
+          && typeof parsed === "object"
+          && !Array.isArray(initialRef.current)
+          && !Array.isArray(parsed)
+        ) ? { ...initialRef.current, ...parsed } as T : parsed;
+        setValue(merged);
+      }
     } catch {
       // Keep the safe default if browser storage is unavailable.
     }
@@ -388,6 +450,17 @@ function formatQuantity(quantity: number, unit: PlannedGrocery["unit"]) {
   return `${quantity < 1 ? quantity.toFixed(2) : quantity.toFixed(1)} ${unit}`;
 }
 
+function formatIngredient(ingredient: RecipeIngredient, multiplier: number) {
+  const quantity = ingredient.amount * multiplier;
+  const precision = quantity < 1 ? 2 : quantity < 10 ? 1 : 0;
+  const unit = ingredient.unit === "count"
+    ? ""
+    : ingredient.unit === "slice"
+      ? quantity === 1 ? "slice" : "slices"
+      : ingredient.unit;
+  return `${Number(quantity.toFixed(precision))} ${unit}`.trim();
+}
+
 export default function Home() {
   const [section, setSection] = useState<Section>("setup");
   const [checks, setChecks] = useStoredState<CheckMap>("p220-checks", {});
@@ -399,17 +472,25 @@ export default function Home() {
   const [sleep, setSleep] = useStoredState("p220-sleep", 8);
   const [calorieTarget, setCalorieTarget] = useStoredState("p220-calorie-target", 2400);
   const [plannedDays, setPlannedDays] = useStoredState("p220-grocery-days", 7);
+  const [weightHistory, setWeightHistory] = useStoredState<WeightEntry[]>("p220-weight-history", []);
+  const [cookbookServings, setCookbookServings] = useStoredState<Record<string, number>>("p220-cookbook-servings", {});
+  const [remindersEnabled, setRemindersEnabled] = useStoredState("p220-reminders-enabled", false);
+  const [reminderLead, setReminderLead] = useStoredState("p220-reminder-lead", 10);
+  const [progressNote, setProgressNote] = useState("");
+  const [routineDay, setRoutineDay] = useState(currentDay());
+  const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   const day = currentDay();
-  const workouts = useMemo(() => buildWorkoutWeek(profile), [profile]);
+  const workouts = buildWorkoutWeek(profile);
   const workout = workouts[day] || workouts.Sunday;
-  const dailyTasks = useMemo(() => buildDailyTasks(profile), [profile]);
-  const meals = useMemo(() => buildMeals(profile, calorieTarget), [profile, calorieTarget]);
-  const scaledGroceries = useMemo(
-    () => buildGroceries(profile, plannedDays, calorieTarget),
-    [profile, plannedDays, calorieTarget],
-  );
-  const warnings = useMemo(() => planWarnings(profile), [profile]);
+  const routineWeek = buildRoutineWeek(profile);
+  const dailyTasks = routineWeek[day] || buildDailyTasks(profile, day);
+  const selectedRoutineTasks = routineWeek[routineDay] || [];
+  const meals = buildMeals(profile, calorieTarget);
+  const cookbook = buildCookbook(profile, calorieTarget);
+  const scaledGroceries = buildGroceries(profile, plannedDays, calorieTarget);
+  const warnings = planWarnings(profile);
   const dailyProtein = proteinTarget(profile);
   const unit = weightUnit(profile.units);
   const currentDisplayWeight = displayWeight(weightKg, profile.units);
@@ -419,15 +500,8 @@ export default function Home() {
   const nextCheckpoint = profile.goalWeightKg >= profile.weightKg
     ? Math.min(goalDisplayWeight, Math.ceil((currentDisplayWeight + 0.01) / checkpointStep) * checkpointStep)
     : Math.max(goalDisplayWeight, Math.floor((currentDisplayWeight - 0.01) / checkpointStep) * checkpointStep);
-  const milestoneValues = useMemo(
-    () => Array.from({ length: 10 }, (_, index) => profile.weightKg + ((profile.goalWeightKg - profile.weightKg) * (index + 1)) / 10),
-    [profile.weightKg, profile.goalWeightKg],
-  );
-
-  const trackedIds = useMemo(
-    () => [...dailyTasks.map((item) => item[0]), ...workout.exercises.map((_, index) => `exercise-${day}-${index}`)],
-    [dailyTasks, day, workout.exercises],
-  );
+  const milestoneValues = Array.from({ length: 10 }, (_, index) => profile.weightKg + ((profile.goalWeightKg - profile.weightKg) * (index + 1)) / 10);
+  const trackedIds = [...dailyTasks.map((item) => item[0]), ...workout.exercises.map((_, index) => `exercise-${day}-${index}`)];
   const complete = trackedIds.filter((id) => checks[id]).length;
   const dailyScore = Math.round((complete / trackedIds.length) * 100);
   const progressDenominator = profile.goalWeightKg - profile.weightKg;
@@ -451,23 +525,133 @@ export default function Home() {
     setDraft((previous) => ({ ...previous, [key]: value }));
   };
 
-  const toggleDraftList = (key: "allergies" | "conditions", value: string) => {
+  const toggleDraftList = (
+    key: "allergies" | "conditions" | "selectedFoods" | "selectedSupplements" | "dietaryPractices" | "workSchoolDays" | "routineActivities" | "wellnessPriorities",
+    value: string,
+  ) => {
     setDraft((previous) => ({
       ...previous,
-      [key]: previous[key].includes(value)
-        ? previous[key].filter((item) => item !== value)
-        : [...previous[key], value],
+      [key]: (previous[key] ?? []).includes(value)
+        ? (previous[key] ?? []).filter((item) => item !== value)
+        : [...(previous[key] ?? []), value],
     }));
   };
 
   const generatePlan = () => {
-    const next = { ...draft, completed: true };
+    const compatibleFoods = (draft.selectedFoods ?? []).filter((id) => {
+      const food = foodCatalog.flatMap((group) => group.items).find((item) => item.id === id);
+      return food ? foodIsCompatible(draft, food) : false;
+    });
+    const supplements = draft.selectedSupplements ?? [];
+    const next = {
+      ...draft,
+      completed: true,
+      selectedFoods: compatibleFoods,
+      usesProteinPowder: supplements.includes("protein-powder") || supplements.includes("mass-gainer"),
+      usesCreatine: supplements.includes("creatine"),
+      usesMultivitamin: supplements.includes("multivitamin"),
+    };
     setProfile(next);
     setWeightKg(next.weightKg);
     setCalorieTarget(estimateCalories(next));
+    if (!weightHistory.length) {
+      setWeightHistory([{ id: `start-${Date.now()}`, date: new Date().toISOString(), weightKg: next.weightKg, note: "Starting weight" }]);
+    }
     setChecks({});
     setGroceryChecks({});
     setSection("today");
+  };
+
+  const logWeight = (photoDataUrl?: string) => {
+    const entry: WeightEntry = {
+      id: `weight-${Date.now()}`,
+      date: new Date().toISOString(),
+      weightKg,
+      note: progressNote.trim() || undefined,
+      photoDataUrl,
+    };
+    setWeightHistory((previous) => [entry, ...previous]);
+    setProgressNote("");
+  };
+
+  const handleProgressPhoto = (file?: File) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const image = new Image();
+      image.onload = () => {
+        const scale = Math.min(1, 1200 / Math.max(image.width, image.height));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(image.width * scale));
+        canvas.height = Math.max(1, Math.round(image.height * scale));
+        const context = canvas.getContext("2d");
+        if (!context) return;
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+        logWeight(canvas.toDataURL("image/jpeg", 0.78));
+      };
+      image.src = String(reader.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const updateActivitySetting = (field: "activityTimes" | "activityDays", id: string, value: string) => {
+    setDraft((previous) => ({ ...previous, [field]: { ...(previous[field] ?? {}), [id]: value } }));
+  };
+
+  const enableReminders = async () => {
+    if (typeof Notification === "undefined") return;
+    const permission = await Notification.requestPermission();
+    setRemindersEnabled(permission === "granted");
+    if (permission === "granted") {
+      new Notification("Project 220 reminders are ready", { body: "Your in-app schedule reminders are enabled on this device." });
+    }
+  };
+
+  const downloadRoutineCalendar = () => {
+    const now = new Date();
+    const mondayOffset = (8 - (now.getDay() || 7)) % 7;
+    const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Project 220//Routine//EN", "CALSCALE:GREGORIAN"];
+    weekDays.forEach((dayName, index) => {
+      const eventDate = new Date(now);
+      eventDate.setDate(now.getDate() + mondayOffset + index);
+      (routineWeek[dayName] || []).forEach(([id, time, title, detail]) => {
+        if (!/^\d{2}:\d{2}$/.test(time)) return;
+        const [hours, minutes] = time.split(":").map(Number);
+        const start = new Date(eventDate);
+        start.setHours(hours, minutes, 0, 0);
+        const end = new Date(start.getTime() + 30 * 60 * 1000);
+        const stamp = (value: Date) => value.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+        lines.push(
+          "BEGIN:VEVENT",
+          `UID:${id}-${start.getTime()}@project220`,
+          `DTSTAMP:${stamp(now)}`,
+          `DTSTART:${stamp(start)}`,
+          `DTEND:${stamp(end)}`,
+          `SUMMARY:${title.replaceAll(",", "\\,")}`,
+          `DESCRIPTION:${detail.replaceAll(",", "\\,")}`,
+          "BEGIN:VALARM",
+          `TRIGGER:-PT${reminderLead}M`,
+          "ACTION:DISPLAY",
+          `DESCRIPTION:Project 220 - ${title.replaceAll(",", "\\,")}`,
+          "END:VALARM",
+          "END:VEVENT",
+        );
+      });
+    });
+    lines.push("END:VCALENDAR");
+    const blob = new Blob([lines.join("\r\n")], { type: "text/calendar;charset=utf-8" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "project-220-routine.ics";
+    link.click();
+    URL.revokeObjectURL(link.href);
+  };
+
+  const installApp = async () => {
+    if (!installPrompt) return;
+    await installPrompt.prompt();
+    await installPrompt.userChoice;
+    setInstallPrompt(null);
   };
 
   const formattedDate = new Intl.DateTimeFormat("en-CA", {
@@ -475,6 +659,44 @@ export default function Home() {
     month: "long",
     day: "numeric",
   }).format(new Date());
+
+  useEffect(() => {
+    if (!remindersEnabled || typeof Notification === "undefined" || Notification.permission !== "granted") return;
+    const now = new Date();
+    const reminderTasks = buildDailyTasks(profile, currentDay());
+    const timers = reminderTasks.flatMap(([, time, title, detail]) => {
+      if (!/^\d{2}:\d{2}$/.test(time)) return [];
+      const [hours, minutes] = time.split(":").map(Number);
+      const alertAt = new Date(now);
+      alertAt.setHours(hours, minutes - reminderLead, 0, 0);
+      const delay = alertAt.getTime() - now.getTime();
+      if (delay <= 0 || delay > 24 * 60 * 60 * 1000) return [];
+      return [window.setTimeout(() => {
+        const message = title.toLowerCase().includes("training")
+          ? `${motivationQuotes[Math.floor(Math.random() * motivationQuotes.length)]} ${detail}`
+          : detail;
+        new Notification(`Project 220 - ${title}`, { body: message, icon: "./icon.svg" });
+      }, delay)];
+    });
+    return () => timers.forEach((timer) => window.clearTimeout(timer));
+  }, [profile, reminderLead, remindersEnabled]);
+
+  useEffect(() => {
+    const capture = (event: Event) => {
+      event.preventDefault();
+      setInstallPrompt(event as InstallPromptEvent);
+    };
+    window.addEventListener("beforeinstallprompt", capture);
+    return () => window.removeEventListener("beforeinstallprompt", capture);
+  }, []);
+
+  useEffect(() => {
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("./sw.js").catch(() => {
+        // Online use remains available when offline installation is unsupported.
+      });
+    }
+  }, []);
 
   return (
     <div className="app-shell">
@@ -511,7 +733,7 @@ export default function Home() {
               <div>
                 <p className="eyebrow">PUBLIC PERSONAL PLAN GENERATOR</p>
                 <h1>{profile.completed ? "Update my plan" : "Build my Project 220 plan"}</h1>
-                <p>Answer the questions once. Project 220 will generate a starter workout, meal schedule, protein target, daily routine, and automatic grocery list.</p>
+                <p>Answer the questions once. Project 220 will generate a starter workout, meal schedule, measured cookbook, product guide, daily routine, reminders, and automatic grocery list.</p>
               </div>
               {profile.completed && (
                 <div className="day-badge"><small>PLAN STATUS</small><strong>Generated</strong></div>
@@ -539,12 +761,26 @@ export default function Home() {
                       <option value="metric">Metric (kg / cm)</option>
                     </select>
                   </label>
+                  <label className="field">Gender identity
+                    <select value={draft.genderIdentity} onChange={(event) => updateDraft("genderIdentity", event.target.value)}>
+                      {genderOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                    </select>
+                  </label>
+                  <label className="field">Pronouns (optional)
+                    <input value={draft.pronouns} onChange={(event) => updateDraft("pronouns", event.target.value)} placeholder="she/her, he/him, they/them" />
+                  </label>
+                  {draft.genderIdentity === "another" && (
+                    <label className="field span-2">How would you describe your identity?
+                      <input value={draft.genderIdentityOther} onChange={(event) => updateDraft("genderIdentityOther", event.target.value)} />
+                    </label>
+                  )}
                   <label className="field span-2">Sex used only for the calorie equation
                     <select value={draft.sexForEstimate} onChange={(event) => updateDraft("sexForEstimate", event.target.value as UserProfile["sexForEstimate"])}>
                       <option value="unspecified">Use a midpoint estimate</option>
                       <option value="male">Male equation</option>
                       <option value="female">Female equation</option>
                     </select>
+                    <small>This optional physiological input is separate from gender identity. Choose midpoint if neither binary equation fits or you prefer not to answer.</small>
                   </label>
                   {draft.units === "imperial" ? (
                     <>
@@ -644,6 +880,9 @@ export default function Home() {
                       <option value="evening">Evening</option>
                     </select>
                   </label>
+                  <label className="field">Preferred workout clock time
+                    <input type="time" value={draft.workoutClock} onChange={(event) => updateDraft("workoutClock", event.target.value)} />
+                  </label>
                 </div>
               </section>
 
@@ -653,14 +892,15 @@ export default function Home() {
                   <label className="field span-2">Eating style
                     <select value={draft.diet} onChange={(event) => updateDraft("diet", event.target.value as UserProfile["diet"])}>
                       <option value="omnivore">Omnivore</option>
+                      <option value="pescatarian">Pescatarian</option>
                       <option value="vegetarian">Vegetarian</option>
                       <option value="vegan">Vegan</option>
                     </select>
                   </label>
                   <div className="field span-2"><span>Allergies or exclusions</span>
                     <div className="choice-chips">
-                      {["nuts", "dairy", "eggs", "gluten", "seafood"].map((item) => (
-                        <button type="button" key={item} className={draft.allergies.includes(item) ? "selected" : ""} onClick={() => toggleDraftList("allergies", item)}>{item}</button>
+                      {["peanuts", "tree-nuts", "dairy", "eggs", "gluten", "fish", "shellfish", "soy", "sesame"].map((item) => (
+                        <button type="button" key={item} className={(draft.allergies ?? []).includes(item) ? "selected" : ""} onClick={() => toggleDraftList("allergies", item)}>{item}</button>
                       ))}
                     </div>
                   </div>
@@ -669,9 +909,9 @@ export default function Home() {
                   </label>
                   <div className="field span-2"><span>Products you already use</span>
                     <div className="choice-chips">
-                      <button type="button" className={draft.usesProteinPowder ? "selected" : ""} onClick={() => updateDraft("usesProteinPowder", !draft.usesProteinPowder)}>Protein powder</button>
-                      <button type="button" className={draft.usesCreatine ? "selected" : ""} onClick={() => updateDraft("usesCreatine", !draft.usesCreatine)}>Creatine</button>
-                      <button type="button" className={draft.usesMultivitamin ? "selected" : ""} onClick={() => updateDraft("usesMultivitamin", !draft.usesMultivitamin)}>Multivitamin</button>
+                      <button type="button" className={(draft.selectedSupplements ?? []).includes("protein-powder") ? "selected" : ""} onClick={() => toggleDraftList("selectedSupplements", "protein-powder")}>Protein powder</button>
+                      <button type="button" className={(draft.selectedSupplements ?? []).includes("creatine") ? "selected" : ""} onClick={() => toggleDraftList("selectedSupplements", "creatine")}>Creatine</button>
+                      <button type="button" className={(draft.selectedSupplements ?? []).includes("multivitamin") ? "selected" : ""} onClick={() => toggleDraftList("selectedSupplements", "multivitamin")}>Multivitamin</button>
                     </div>
                   </div>
                 </div>
@@ -701,6 +941,107 @@ export default function Home() {
                 <div className="builder-safety">
                   <strong>When professional review comes first</strong>
                   <p>Minors, pregnancy/postpartum, eating disorders, significant medical conditions, recent surgery, unexplained weight change, or symptoms during exercise require a qualified clinician before following an automated plan.</p>
+                </div>
+              </section>
+
+              <section className="builder-card span-full">
+                <div className="builder-card-heading"><span>05</span><div><strong>Foods I enjoy</strong><small>The meal plan, cookbook, and grocery list use these choices</small></div></div>
+                <div className="form-grid compact-form">
+                  <label className="field">Meals and snacks per day
+                    <input type="number" min="3" max="8" value={draft.mealsPerDay} onChange={(event) => updateDraft("mealsPerDay", Number(event.target.value))} />
+                  </label>
+                  <label className="field">Cooking preference
+                    <select value={draft.cookingStyle} onChange={(event) => updateDraft("cookingStyle", event.target.value as UserProfile["cookingStyle"])}>
+                      <option value="quick">Fast and simple</option><option value="balanced">Fresh plus easy meals</option><option value="batch">Batch cook and freeze</option>
+                    </select>
+                  </label>
+                  <div className="field span-2"><span>Dietary or cultural practices (optional)</span>
+                    <div className="choice-chips">
+                      {[["halal", "Halal"], ["kosher", "Kosher"], ["low-lactose", "Low lactose"], ["skinless", "Skinless meat"], ["peeled-produce", "Peeled produce"], ["soft-texture", "Soft / cooked texture"]].map(([id, label]) => (
+                        <button type="button" key={id} className={(draft.dietaryPractices ?? []).includes(id) ? "selected" : ""} onClick={() => toggleDraftList("dietaryPractices", id)}>{label}</button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div className="food-catalog">
+                  {foodCatalog.map((group) => (
+                    <section key={group.title}>
+                      <h3>{group.title}</h3><p>{group.description}</p>
+                      <div className="choice-chips food-options">
+                        {group.items.map((food) => {
+                          const compatible = foodIsCompatible(draft, food);
+                          return (
+                            <button type="button" key={food.id} disabled={!compatible} title={!compatible ? "Unavailable because of your eating style or allergy choices" : ""} className={(draft.selectedFoods ?? []).includes(food.id) ? "selected" : ""} onClick={() => toggleDraftList("selectedFoods", food.id)}>
+                              {food.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </section>
+                  ))}
+                </div>
+                <label className="field custom-entry">Other foods or culturally important staples
+                  <input value={draft.customFoods} onChange={(event) => updateDraft("customFoods", event.target.value)} placeholder="Add foods that are not listed" />
+                </label>
+              </section>
+
+              <section className="builder-card span-full">
+                <div className="builder-card-heading"><span>06</span><div><strong>Supplements, vitamins, and multivitamins</strong><small>Select what you use or want explained; selection is not a recommendation</small></div></div>
+                <div className="supplement-selector">
+                  {supplementOptions.map((item) => (
+                    <button type="button" key={item.id} className={(draft.selectedSupplements ?? []).includes(item.id) ? "selected" : ""} onClick={() => toggleDraftList("selectedSupplements", item.id)}>
+                      <strong>{item.name}</strong><span>{item.use}</span>
+                    </button>
+                  ))}
+                </div>
+                <label className="field custom-entry">Other product
+                  <input value={draft.customSupplements} onChange={(event) => updateDraft("customSupplements", event.target.value)} placeholder="Brand or product name; always check the full label" />
+                </label>
+                <div className="builder-safety"><strong>Selection does not set a vitamin dose.</strong><p>Needs depend on age, diet, pregnancy, blood work, health conditions, and medications. The generated guide explains purpose and timing, then flags products that need pharmacist or clinician review.</p></div>
+              </section>
+
+              <section className="builder-card span-full">
+                <div className="builder-card-heading"><span>07</span><div><strong>Work, school, family, and daily life</strong><small>The weekly routine places fitness around your real commitments</small></div></div>
+                <div className="form-grid">
+                  <label className="field">Wake time<input type="time" value={draft.wakeTime} onChange={(event) => updateDraft("wakeTime", event.target.value)} /></label>
+                  <label className="field">Bedtime<input type="time" value={draft.bedTime} onChange={(event) => updateDraft("bedTime", event.target.value)} /></label>
+                  <label className="field">Regular commitment
+                    <select value={draft.workSchoolMode} onChange={(event) => updateDraft("workSchoolMode", event.target.value as UserProfile["workSchoolMode"])}>
+                      <option value="none">No fixed work or school hours</option><option value="work">Work</option><option value="school">School / study</option><option value="both">Work and school</option>
+                    </select>
+                  </label>
+                  <label className="field">Start time<input type="time" value={draft.workStart} onChange={(event) => updateDraft("workStart", event.target.value)} /></label>
+                  <label className="field">End time<input type="time" value={draft.workEnd} onChange={(event) => updateDraft("workEnd", event.target.value)} /></label>
+                  <div className="field span-2"><span>Work or school days</span>
+                    <div className="choice-chips">{weekDays.map((name) => <button type="button" key={name} className={(draft.workSchoolDays ?? []).includes(name) ? "selected" : ""} onClick={() => toggleDraftList("workSchoolDays", name)}>{name.slice(0, 3)}</button>)}</div>
+                  </div>
+                  <label className="field">Dog walks per day<input type="number" min="0" max="6" value={draft.dogWalks} onChange={(event) => updateDraft("dogWalks", Number(event.target.value))} /></label>
+                  <div className="field span-2 dog-time-grid"><span>Dog-walk times</span>
+                    {Array.from({ length: Math.max(0, draft.dogWalks) }, (_, index) => (
+                      <label key={index}>Walk {index + 1}<input type="time" value={(draft.dogWalkTimes ?? [])[index] || ["07:00", "13:00", "19:00", "21:30"][index] || "12:00"} onChange={(event) => {
+                        const times = [...(draft.dogWalkTimes ?? [])];
+                        times[index] = event.target.value;
+                        updateDraft("dogWalkTimes", times);
+                      }} /></label>
+                    ))}
+                  </div>
+                </div>
+                <div className="routine-selector">
+                  <h3>Other activities to schedule</h3>
+                  <div className="choice-chips">{routineActivityCatalog.map((item) => <button type="button" key={item.id} className={(draft.routineActivities ?? []).includes(item.id) ? "selected" : ""} onClick={() => toggleDraftList("routineActivities", item.id)}>{item.label}</button>)}</div>
+                  {(draft.routineActivities ?? []).map((id) => {
+                    const item = routineActivityCatalog.find((entry) => entry.id === id);
+                    if (!item) return null;
+                    return (
+                      <div className="activity-config" key={id}>
+                        <div><strong>{item.label}</strong><small>{item.detail}</small></div>
+                        <input aria-label={`${item.label} time`} type="time" value={draft.activityTimes?.[id] || item.defaultTime} onChange={(event) => updateActivitySetting("activityTimes", id, event.target.value)} />
+                        <select aria-label={`${item.label} days`} value={draft.activityDays?.[id] || item.defaultDay} onChange={(event) => updateActivitySetting("activityDays", id, event.target.value)}>
+                          <option value="daily">Every day</option><option value="weekdays">Weekdays</option><option value="weekends">Weekends</option>{weekDays.map((name) => <option key={name} value={name}>{name}</option>)}
+                        </select>
+                      </div>
+                    );
+                  })}
                 </div>
               </section>
             </div>
@@ -841,6 +1182,7 @@ export default function Home() {
               <div><p className="eyebrow">{profile.equipment.toUpperCase()} / PERSONAL STARTER PLAN</p><h1>{day}: {workout.title}</h1><p>Controlled form, 1-2 good reps in reserve, and gradual progression.</p></div>
               <div className="day-badge"><small>EXPERIENCE</small><strong>{profile.experience}</strong></div>
             </div>
+            <blockquote className="motivation-banner workout-motivation"><span>COACH&apos;S WORKOUT MESSAGE</span>{motivationQuotes[new Date().getDate() % motivationQuotes.length]}</blockquote>
             <div className="training-primer">
               <div><span>01</span><strong>{profile.conditions.includes("ostomy") ? "Empty and secure the pouch" : "Check readiness"}</strong><p>{profile.conditions.includes("ostomy") ? "Use the washroom first and make sure the pouch and clothing feel secure without being compressed." : "Start only if you feel well. New pain, chest pressure, dizziness, or unusual shortness of breath means stop and seek appropriate advice."}</p></div>
               <div><span>02</span><strong>Warm up for 5-10 minutes</strong><p>Walk easily, move the shoulders and hips, then perform one light practice set of the first exercise.</p></div>
@@ -852,7 +1194,7 @@ export default function Home() {
                 const id = `exercise-${day}-${index}`;
                 return (
                   <button key={exercise[0]} className={checks[id] ? "workout-row completed" : "workout-row"} onClick={() => toggle(id)}>
-                    <span><strong>{exercise[0]}</strong><small>1 sec lift / 1 sec pause / 3 sec lower</small></span>
+                    <span><strong>{exercise[0]}</strong><small>1 sec lift / 1 sec pause / 3 sec lower · {motivationQuotes[index % motivationQuotes.length]}</small></span>
                     <span>{exercise[1]}</span><span>{exercise[2]}</span><span className="row-check">{checks[id] ? "OK" : ""}</span>
                   </button>
                 );
@@ -924,6 +1266,10 @@ export default function Home() {
               <div><small>EATING STYLE</small><strong>{profile.diet}</strong></div>
               <div><small>MEAL PATTERN</small><strong>{meals.length} feedings</strong></div>
             </div>
+            <div className="plan-link-strip">
+              <div><strong>{(profile.selectedFoods ?? []).length} preferred foods and {(profile.selectedSupplements ?? []).length} selected products are active.</strong><span>The cookbook and grocery list rebuild automatically when this plan changes.</span></div>
+              <button onClick={() => setSection("cookbook")}>Open my cookbook</button>
+            </div>
 
             <div className="meal-list">
               {meals.map(([name, time, portion, note]) => (
@@ -971,6 +1317,57 @@ export default function Home() {
             <div className="medical-note">
               <strong>Use health, tolerance, and the weight trend—not one calculated number.</strong>
               <p>{warnings.length ? warnings.join(" ") : "Introduce major changes gradually. Allergic reactions, repeated digestive symptoms, rapid unexplained weight change, or a medically prescribed diet require professional care."}</p>
+            </div>
+          </section>
+        )}
+
+        {section === "cookbook" && (
+          <section className="content-page">
+            <div className="page-heading compact">
+              <div><p className="eyebrow">AUTOMATIC PERSONAL COOKBOOK</p><h1>Recipes made from your food choices</h1><p>Every recipe uses the foods selected in My Plan wherever possible. Change servings to recalculate exact ingredient quantities.</p></div>
+              <div className="day-badge"><small>GENERATED</small><strong>{cookbook.length} recipes</strong></div>
+            </div>
+            <div className="cookbook-intro">
+              <div><small>SELECTED FOODS</small><strong>{(profile.selectedFoods ?? []).length}</strong><span>used to personalize recipes</span></div>
+              <div><small>COOKING STYLE</small><strong>{profile.cookingStyle}</strong><span>{profile.mealsPerDay} planned feedings daily</span></div>
+              <div><small>SAFETY FILTERS</small><strong>{(profile.allergies ?? []).length}</strong><span>allergies or exclusions applied</span></div>
+              <button onClick={() => setSection("setup")}>Change food choices</button>
+            </div>
+            <div className="recipe-grid">
+              {cookbook.map((recipe, index) => {
+                const servings = cookbookServings[recipe.id] || recipe.servings;
+                const multiplier = servings / recipe.servings;
+                return (
+                  <details key={recipe.id} className="recipe-card" open={index === 0}>
+                    <summary>
+                      <div><small>{recipe.meal}</small><h2>{recipe.title}</h2><span>{recipe.prepMinutes} min prep · {recipe.cookMinutes} min cook</span></div>
+                      <b>Open recipe</b>
+                    </summary>
+                    <div className="recipe-body">
+                      <div className="recipe-serving-control">
+                        <label>Make
+                          <input type="number" min="1" max="12" value={servings} onChange={(event) => setCookbookServings((previous) => ({ ...previous, [recipe.id]: Math.max(1, Math.min(12, Number(event.target.value))) }))} />
+                          servings
+                        </label>
+                        <span>Nutrition is approximate per serving.</span>
+                      </div>
+                      <section><h3>Exact ingredients</h3>
+                        <ul className="ingredient-list">{recipe.ingredients.map((ingredient, ingredientIndex) => <li key={`${ingredient.item}-${ingredientIndex}`}><strong>{formatIngredient(ingredient, multiplier)}</strong><span>{ingredient.item}</span></li>)}</ul>
+                      </section>
+                      <section><h3>Method</h3>
+                        <ol>{recipe.steps.map((step, stepIndex) => <li key={step}>{stepIndex + 1}. {step}</li>)}</ol>
+                      </section>
+                      <div className="recipe-nutrition"><strong>Approximate nutrition</strong><span>{recipe.nutrition}</span></div>
+                      <p className="recipe-note">{recipe.note}</p>
+                    </div>
+                  </details>
+                );
+              })}
+            </div>
+            <div className="medical-note">
+              <strong>Measurements are exact; nutrition remains an estimate.</strong>
+              <p>Brands, cooking losses, ripeness, and package labels change the final totals. Verify allergens every time. Medical diets, swallowing issues, eating-disorder recovery, kidney disease, diabetes, pregnancy, and ostomy-related food tolerance need individualized guidance.</p>
+              <a href="https://www.canada.ca/en/health-canada/services/food-guide/eating-support/cooking/make-healthy-meals-plate.html" target="_blank" rel="noreferrer">See Health Canada&apos;s healthy plate guidance</a>
             </div>
           </section>
         )}
@@ -1033,6 +1430,21 @@ export default function Home() {
               <div><p className="eyebrow">WHAT / HOW MUCH / WHEN</p><h1>Supplements & products</h1><p>Optional adult guidance. Food, training, recovery, and the daily total come before products.</p></div>
             </div>
 
+            <div className="selected-products">
+              <div className="section-title subheading"><div><p className="eyebrow">YOUR SELECTIONS</p><h2>Generated product guide</h2></div><button className="text-button" onClick={() => setSection("setup")}>Change selections</button></div>
+              {(profile.selectedSupplements ?? []).length ? (
+                <div className="selected-product-grid">
+                  {supplementOptions.filter((item) => (profile.selectedSupplements ?? []).includes(item.id)).map((item) => (
+                    <article key={item.id}>
+                      <span>SELECTED - NOT AUTOMATICALLY RECOMMENDED</span><h3>{item.name}</h3><p>{item.use}</p>
+                      <dl><div><dt>Best time</dt><dd>{item.timing}</dd></div><div><dt>Amount</dt><dd>{item.amount}</dd></div><div><dt>Check first</dt><dd>{item.review}</dd></div></dl>
+                    </article>
+                  ))}
+                </div>
+              ) : <div className="empty-state"><strong>No products selected.</strong><span>That is completely fine. Supplements are optional and food comes first.</span></div>}
+              {profile.customSupplements && <p className="custom-product-note"><strong>Other product entered:</strong> {profile.customSupplements}. Check the complete label and review ingredients, doses, interactions, and Canadian licensing before use.</p>}
+            </div>
+
             <div className="supplement-grid">
               {supplementCards.map((supplement, index) => (
                 <article key={supplement.id} className="supplement-card">
@@ -1053,6 +1465,11 @@ export default function Home() {
             <div className="medical-note strong-note">
               <strong>Important before combining products.</strong>
               <p>Bring photos of every label to a physician, dietitian, or pharmacist when you have medical conditions, take prescriptions, are pregnant, are under 18, or use multiple formulas. Do not double doses to make up for a missed day.</p>
+            </div>
+            <div className="source-links">
+              <a href="https://www.canada.ca/en/health-canada/services/drugs-health-products/natural-health-products-canada.html" target="_blank" rel="noreferrer">Health Canada: natural health products</a>
+              <a href="https://www.canada.ca/en/health-canada/services/drugs-health-products/natural-non-prescription/applications-submissions/product-licensing/licensed-natural-health-products-database.html" target="_blank" rel="noreferrer">Look up a Canadian NPN or DIN-HM</a>
+              <a href="https://ods.od.nih.gov/factsheets/list-all/" target="_blank" rel="noreferrer">NIH supplement fact sheets</a>
             </div>
 
             <section className="peptide-decision">
@@ -1096,6 +1513,25 @@ export default function Home() {
             <div className="page-heading compact">
               <div><p className="eyebrow">MEASURE THE TREND</p><h1>Progress command center</h1><p>Track body weight, consistency, and strength without judging progress from one day.</p></div>
             </div>
+            <div className="progress-capture">
+              <button className="weight-camera" onClick={() => photoInputRef.current?.click()}>
+                <small>CURRENT WEIGHT - TAP TO ADD PHOTO</small>
+                <strong>{currentDisplayWeight.toFixed(1)} {unit}</strong>
+                <span>Take a progress picture or choose one from this device</span>
+              </button>
+              <div className="progress-entry-form">
+                <label>Weight ({unit})
+                  <input type="number" min="20" max="700" step="0.1" value={Number(currentDisplayWeight.toFixed(1))} onChange={(event) => setWeightKg(profile.units === "imperial" ? Number(event.target.value) / 2.2046226218 : Number(event.target.value))} />
+                </label>
+                <label>Note (optional)<input value={progressNote} onChange={(event) => setProgressNote(event.target.value)} placeholder="Energy, milestone, or how the week felt" /></label>
+                <div><button onClick={() => photoInputRef.current?.click()}>Take or choose photo</button><button className="secondary-button" onClick={() => logWeight()}>Log weight only</button></div>
+              </div>
+              <input ref={photoInputRef} className="visually-hidden" type="file" accept="image/*" capture="environment" onChange={(event) => {
+                handleProgressPhoto(event.target.files?.[0]);
+                event.currentTarget.value = "";
+              }} />
+            </div>
+            <div className="privacy-strip photo-privacy"><strong>Photo privacy</strong><span>Progress photos stay in this browser on this device. They are not uploaded, shared, or included in the grocery or health-plan generator.</span></div>
             <div className="milestone-grid">
               {milestoneValues.map((targetKg, index) => {
                 const reached = profile.goalWeightKg >= profile.weightKg ? weightKg >= targetKg : weightKg <= targetKg;
@@ -1106,6 +1542,19 @@ export default function Home() {
                 );
               })}
             </div>
+            <div className="section-title subheading"><div><p className="eyebrow">WEIGHT + PHOTO HISTORY</p><h2>Your progress timeline</h2></div><span>{weightHistory.length} entries saved on this device</span></div>
+            {weightHistory.length ? (
+              <div className="progress-gallery">
+                {weightHistory.map((entry) => (
+                  <article key={entry.id}>
+                    {/* Device-local data URLs are user-selected progress records, not optimized site assets. */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    {entry.photoDataUrl ? <img src={entry.photoDataUrl} alt={`Progress recorded ${new Date(entry.date).toLocaleDateString()}`} /> : <div className="no-photo">WEIGHT LOG</div>}
+                    <div><strong>{displayWeight(entry.weightKg, profile.units).toFixed(1)} {unit}</strong><time>{new Date(entry.date).toLocaleDateString()}</time>{entry.note && <p>{entry.note}</p>}</div>
+                  </article>
+                ))}
+              </div>
+            ) : <div className="empty-state"><strong>No progress entries yet.</strong><span>Tap the weight card to take your first private progress photo.</span></div>}
             <div className="baseline-grid">
               {Object.entries(workouts).slice(0, 6).map(([workoutDay, planned]) => (
                 <article key={workoutDay} className="baseline-card">
@@ -1119,15 +1568,49 @@ export default function Home() {
         {section === "routine" && (
           <section className="content-page">
             <div className="page-heading compact">
-              <div><p className="eyebrow">ONE WORKOUT / ONE MEAL / ONE DAY</p><h1>Daily routine</h1><p>Your repeatable system for training, meals, recovery{profile.dogWalks ? ", and dog walks" : ""}.</p></div>
+              <div><p className="eyebrow">ONE WORKOUT / ONE MEAL / ONE DAY</p><h1>Weekly routine and reminders</h1><p>Your generated schedule works around training, meals, recovery, work, school, family, pets, sports, and social time.</p></div>
+            </div>
+            <div className="reminder-center">
+              <div><small>REMINDER CENTER</small><h2>Stay on schedule without living in the app.</h2><p>In-app reminders work while Project 220 is open. Download the calendar to receive dependable device alarms even when it is closed.</p></div>
+              <label>Remind me before each item
+                <select value={reminderLead} onChange={(event) => setReminderLead(Number(event.target.value))}><option value="0">At start time</option><option value="5">5 minutes before</option><option value="10">10 minutes before</option><option value="15">15 minutes before</option><option value="30">30 minutes before</option><option value="60">1 hour before</option></select>
+              </label>
+              <div className="reminder-actions">
+                <button onClick={enableReminders}>{remindersEnabled ? "Notifications enabled" : "Enable notifications"}</button>
+                <button className="secondary-button" onClick={downloadRoutineCalendar}>Download calendar alarms</button>
+              </div>
+              <span className="reminder-note">iPhone/iPad: open the downloaded calendar file and add its events. Android, Windows, and Mac: import it into your preferred calendar. Browser permission and operating-system notification settings still apply.</span>
+            </div>
+            <blockquote className="motivation-banner"><span>COACH&apos;S MESSAGE</span>{motivationQuotes[weekDays.indexOf(routineDay) % motivationQuotes.length]}</blockquote>
+            <div className="day-tabs" role="tablist" aria-label="Routine day">
+              {weekDays.map((name) => <button role="tab" aria-selected={routineDay === name} key={name} className={routineDay === name ? "active" : ""} onClick={() => setRoutineDay(name)}>{name.slice(0, 3)}</button>)}
             </div>
             <div className="routine-board">
-              {dailyTasks.map(([id, time, title, detail]) => (
+              {selectedRoutineTasks.map(([id, time, title, detail]) => (
                 <button key={id} className={checks[id] ? "routine-row checked" : "routine-row"} onClick={() => toggle(id)}>
                   <time>{time}</time><span className="routine-check">{checks[id] ? "OK" : ""}</span><span><strong>{title}</strong><small>{detail}</small></span>
                 </button>
               ))}
             </div>
+          </section>
+        )}
+
+        {section === "install" && (
+          <section className="content-page">
+            <div className="page-heading compact">
+              <div><p className="eyebrow">ONE APP / EVERY DEVICE</p><h1>Install Project 220</h1><p>Use the same mobile-friendly app on Windows, Mac, iPhone, iPad, Android phones, and Android tablets.</p></div>
+            </div>
+            <div className="install-hero">
+              <div><span className="brand-mark">220</span><div><small>INSTALLABLE WEB APP</small><h2>Fast, full-screen, and available offline</h2><p>Visit once while online, install it, and the core app will open without a connection. Your plan, checklists, weight entries, and progress pictures remain stored on that device.</p></div></div>
+              {installPrompt ? <button onClick={installApp}>Install Project 220 now</button> : <span>Use the instructions for your device below.</span>}
+            </div>
+            <div className="install-grid">
+              <article><span>01</span><h3>iPhone or iPad</h3><ol><li>Open this site in Safari.</li><li>Tap Share.</li><li>Tap Add to Home Screen.</li><li>Turn on Open as Web App, then tap Add.</li></ol></article>
+              <article><span>02</span><h3>Android phone or tablet</h3><ol><li>Open this site in Chrome.</li><li>Tap the menu.</li><li>Choose Install app or Add to Home screen.</li><li>Confirm Install.</li></ol></article>
+              <article><span>03</span><h3>Windows computer</h3><ol><li>Open in Edge or Chrome.</li><li>Choose Apps / Install Project 220 from the browser menu or address bar.</li><li>Confirm Install.</li><li>Pin it to Start or the taskbar if desired.</li></ol></article>
+              <article><span>04</span><h3>Mac computer</h3><ol><li>Open in Safari or Chrome.</li><li>Safari: File, then Add to Dock. Chrome: choose Install from the menu.</li><li>Confirm the app name.</li><li>Launch it from the Dock or Applications.</li></ol></article>
+            </div>
+            <div className="offline-card"><strong>Offline and private by design</strong><p>The app shell is cached after the first successful visit. Personal data is stored separately on each device, so it does not automatically sync. Export or cloud sync is not enabled in this release, and clearing browser data can remove local records.</p></div>
           </section>
         )}
       </main>
