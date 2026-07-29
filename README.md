@@ -2,6 +2,10 @@
 
 Project 220 is a public, device-private starter planning app for workouts, meals, groceries, supplements, routines, and progress.
 
+## Ownership
+
+Project 220 Health & Fitness was created by and is owned by **Marcel Joseph Goulet**. No open-source licence is granted by this repository unless the owner provides separate written permission.
+
 ## What it generates
 
 - Age- and experience-aware resistance-training schedules

@@ -2944,6 +2944,24 @@ button.secondary-button {
   flex: 0 0 auto;
 }
 
+.app-footer {
+  align-items: center;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  display: flex;
+  font-size: 10px;
+  gap: 13px;
+  justify-content: center;
+  margin: 30px auto 0;
+  max-width: 1220px;
+  padding: 24px 20px 34px;
+  text-align: center;
+}
+
+.app-footer strong {
+  color: var(--ink);
+}
+
 @media (max-width: 900px) {
   .food-catalog,
   .supplement-selector,
@@ -3023,5 +3041,11 @@ button.secondary-button {
 
   .mobile-nav button {
     flex-basis: 66px;
+  }
+
+  .app-footer {
+    flex-direction: column;
+    gap: 5px;
+    padding-bottom: 105px;
   }
 }

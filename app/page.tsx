@@ -1615,6 +1615,12 @@ export default function Home() {
         )}
       </main>
 
+      <footer className="app-footer">
+        <strong>Project 220 Health & Fitness</strong>
+        <span>Created and owned by Marcel Joseph Goulet.</span>
+        <small>Personalized planning and education; not medical diagnosis or treatment.</small>
+      </footer>
+
       <nav className="mobile-nav" aria-label="Mobile navigation">
         {navItems.map((item) => (
           <button key={item.id} className={section === item.id ? "active" : ""} onClick={() => setSection(item.id)}>
