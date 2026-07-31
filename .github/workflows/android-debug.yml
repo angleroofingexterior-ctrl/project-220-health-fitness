@@ -1,0 +1,63 @@
+name: Build Project 220 Android Demo
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "public-shell/**"
+      - "public-github/**"
+      - "app/**"
+      - "package.json"
+      - "package-lock.json"
+      - "capacitor.config.ts"
+      - ".github/workflows/android-debug.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  android-debug:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build shared web application
+        run: npm run build:public
+
+      - name: Create Android project
+        run: |
+          if [ ! -d android ]; then
+            npx cap add android
+          fi
+          npx cap sync android
+
+      - name: Build debug APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Upload Project 220 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Project-220-Android-Debug
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30
