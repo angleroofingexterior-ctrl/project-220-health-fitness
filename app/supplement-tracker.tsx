@@ -19,24 +19,20 @@ function formatNumber(value: number, maximumFractionDigits = 1) {
 }
 
 export default function SupplementTracker() {
-  const [store, setStore] = useState<SupplementStoreSnapshot | null>(null);
-  const [productId, setProductId] = useState("");
+  const [store, setStore] = useState<SupplementStoreSnapshot>(() => loadSupplementStore());
+  const [productId, setProductId] = useState(
+    () => loadSupplementStore().products[0]?.id ?? "",
+  );
   const [amount, setAmount] = useState("");
   const [notes, setNotes] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const loaded = loadSupplementStore();
-    setStore(loaded);
-    setProductId(loaded.products[0]?.id ?? "");
-  }, []);
-
-  useEffect(() => {
-    if (store) saveSupplementStore(store);
+    saveSupplementStore(store);
   }, [store]);
 
   const selectedProduct = useMemo(
-    () => store?.products.find((product) => product.id === productId),
+    () => store.products.find((product) => product.id === productId),
     [store, productId],
   );
 
@@ -52,12 +48,11 @@ export default function SupplementTracker() {
   }, [amount, selectedProduct]);
 
   const totals = useMemo(
-    () => (store ? calculateSupplementTotalsForDate(store) : null),
+    () => calculateSupplementTotalsForDate(store),
     [store],
   );
 
   const todayEntries = useMemo(() => {
-    if (!store) return [];
     const today = new Date();
     return store.entries
       .filter((entry) => {
@@ -68,12 +63,12 @@ export default function SupplementTracker() {
   }, [store]);
 
   function productForEntry(productIdToFind: string): SupplementProduct | undefined {
-    return store?.products.find((product) => product.id === productIdToFind);
+    return store.products.find((product) => product.id === productIdToFind);
   }
 
   function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!store || !selectedProduct) return;
+    if (!selectedProduct) return;
 
     try {
       setStore(
@@ -90,10 +85,6 @@ export default function SupplementTracker() {
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to save supplement.");
     }
-  }
-
-  if (!store || !totals) {
-    return <p aria-live="polite">Loading supplements…</p>;
   }
 
   return (
@@ -162,7 +153,7 @@ export default function SupplementTracker() {
       </form>
 
       <div>
-        <h3>Today's supplement log</h3>
+        <h3>Today&apos;s supplement log</h3>
         {todayEntries.length === 0 ? (
           <p>No supplements logged today.</p>
         ) : (
