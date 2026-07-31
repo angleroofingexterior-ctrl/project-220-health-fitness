@@ -1,11 +1,11 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import Home from "../app/page";
+import Project220Demo from "./project220-demo";
 import "../app/globals.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <Home />
+    <Project220Demo />
   </React.StrictMode>,
 );
 
