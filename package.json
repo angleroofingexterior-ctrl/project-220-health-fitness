@@ -1,26 +1,31 @@
 {
   "name": "project-220-health-fitness",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "engines": {
-    "node": ">=22.13.0"
-  },
+  "engines": {"node": ">=22.13.0"},
   "scripts": {
     "dev": "node scripts/run-vinext.mjs dev",
     "build": "node scripts/run-vinext.mjs build",
     "build:public": "vite build --config vite.public.config.ts",
+    "verify:pwa": "node scripts/verify-pwa.mjs",
+    "android:init": "npm run build:public && npx cap add android",
+    "android:sync": "npm run build:public && npx cap sync android",
+    "android:debug": "npm run android:sync && cd android && ./gradlew assembleDebug",
     "start": "node scripts/run-vinext.mjs start",
-    "test": "npm run build && node --test tests/rendered-html.test.mjs",
+    "test": "npm run build && npm run verify:pwa && node --test tests/rendered-html.test.mjs",
     "lint": "eslint app public-shell --ignore-pattern dist --ignore-pattern .next --ignore-pattern public-pages",
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
+    "@capacitor/android": "7.4.3",
+    "@capacitor/core": "7.4.3",
     "drizzle-orm": "0.45.2",
     "next": "16.2.6",
     "react": "19.2.6",
     "react-dom": "19.2.6"
   },
   "devDependencies": {
+    "@capacitor/cli": "7.4.3",
     "@cloudflare/vite-plugin": "1.37.1",
     "@tailwindcss/postcss": "4.2.1",
     "@types/node": "22.19.19",
