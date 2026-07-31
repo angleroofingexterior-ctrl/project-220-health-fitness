@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#111111">
+  <meta name="description" content="Project 220 secure account access">
+  <link rel="stylesheet" href="styles.css">
+  <title>Project 220 Account</title>
+</head>
+<body>
+  <header>
+    <div>
+      <span class="eyebrow">PROJECT 220</span>
+      <h1>Your goal. Your plan. Your progress.</h1>
+    </div>
+    <a class="secondary" href="index.html">Back to app</a>
+  </header>
+
+  <main>
+    <section class="hero card">
+      <div>
+        <h2>Secure account access</h2>
+        <p>Create an account to prepare for private cloud backup, personalized programs, pantry inventory and delivery services.</p>
+      </div>
+      <div id="authStatus" class="status">Configuration required</div>
+    </section>
+
+    <section class="stats-grid">
+      <article class="card">
+        <h3>Create account</h3>
+        <form id="signUpForm" class="form-grid">
+          <label>Full name<input id="signUpName" autocomplete="name" required></label>
+          <label>Email<input id="signUpEmail" autocomplete="email" inputmode="email" type="email" required></label>
+          <label>Password<input id="signUpPassword" autocomplete="new-password" minlength="10" type="password" required></label>
+          <label><input id="privacyConsent" type="checkbox" required> I agree to the privacy notice and terms presented by Project 220.</label>
+          <button type="submit">Create account</button>
+        </form>
+      </article>
+
+      <article class="card">
+        <h3>Sign in</h3>
+        <form id="signInForm" class="form-grid">
+          <label>Email<input id="signInEmail" autocomplete="email" inputmode="email" type="email" required></label>
+          <label>Password<input id="signInPassword" autocomplete="current-password" type="password" required></label>
+          <button type="submit">Sign in</button>
+          <button id="resetPassword" class="secondary" type="button">Send password reset</button>
+          <button id="signOut" class="danger hidden" type="button">Sign out</button>
+        </form>
+      </article>
+    </section>
+
+    <section class="card">
+      <h3>Privacy first</h3>
+      <p class="muted">Project 220 must not store passwords directly. Authentication is handled by the configured identity provider. Pantry photos, health records and delivery information must remain private and protected by account-level access controls.</p>
+      <div id="authMessage" role="status" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <footer>Project 220 · Built from one personal goal to help everyone pursue theirs</footer>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="auth-config.js"></script>
+  <script src="auth.js" defer></script>
+</body>
+</html>
