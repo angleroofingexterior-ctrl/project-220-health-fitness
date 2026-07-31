@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="0" />
+<title>Project 220 Admin Login</title>
+<style>
+:root{--bg:#111;--card:#1b1b1b;--red:#c1121f;--silver:#b8bcc2;--white:#fff}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--white);font-family:Arial,Helvetica,sans-serif;min-height:100vh}.wrap{max-width:520px;margin:auto;padding:40px 20px}.logo{text-align:center;font-size:48px;font-weight:900;letter-spacing:-3px}.logo span{color:var(--red)}.tag{text-align:center;color:var(--silver);font-size:12px;letter-spacing:2px;margin:8px 0 30px}.card{background:var(--card);border:1px solid #333;border-radius:20px;padding:22px}.card h1{margin-top:0}label{display:block;margin:15px 0 7px;color:var(--silver)}input{width:100%;padding:15px;border-radius:12px;border:1px solid #444;background:#090909;color:#fff;font-size:16px}button{width:100%;padding:15px;border:0;border-radius:12px;background:var(--red);color:#fff;font-size:16px;font-weight:800;margin-top:18px}.secondary{background:transparent;border:1px solid #555}.hint{margin-top:18px;color:var(--silver);font-size:13px;line-height:1.6}.error{display:none;margin-top:12px;padding:10px;border-radius:10px;background:#351317;color:#ff9696}.hidden{display:none}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:18px}.tile{background:#181818;border:1px solid #333;border-radius:16px;padding:16px;min-height:120px}.tile b{display:block;margin-bottom:8px}.metric{font-size:26px;color:var(--red);font-weight:900}.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}.logout{width:auto;margin:0;padding:10px 12px;background:transparent;border:1px solid #555}.notice{margin-top:16px;padding:12px;border-left:4px solid var(--red);background:#222;border-radius:10px;color:#ddd}
+</style>
+</head>
+<body>
+<section id="login" class="wrap">
+  <div class="logo">PROJECT <span>220</span></div>
+  <div class="tag">BUILD. EAT. RECOVER. REPEAT.</div>
+  <div class="card">
+    <h1>Administrator Sign In</h1>
+    <p style="color:var(--silver)">This page always opens at login and does not use the old saved session.</p>
+    <label for="email">Email</label>
+    <input id="email" value="admin@project220.app" autocomplete="username" />
+    <label for="password">Password</label>
+    <input id="password" type="password" value="Project220Admin!" autocomplete="current-password" />
+    <div id="error" class="error">The administrator email or password is incorrect.</div>
+    <button id="loginButton">Sign In</button>
+    <button class="secondary" id="resetButton" type="button">Reset Login</button>
+    <div class="hint"><b>Email:</b> admin@project220.app<br><b>Password:</b> Project220Admin!</div>
+  </div>
+</section>
+<section id="admin" class="wrap hidden">
+  <div class="top"><div class="logo" style="font-size:27px;text-align:left">PROJECT <span>220</span></div><button class="logout" id="logoutButton">Log out</button></div>
+  <h1>Admin Control Centre</h1>
+  <p style="color:var(--silver)">Prototype controls for the full Project 220 platform.</p>
+  <div class="grid">
+    <button class="tile" data-action="AI Coach"><b>AI Coach</b><span class="metric">4</span><br>Coach intensity profiles</button>
+    <button class="tile" data-action="Pantry AI"><b>Pantry AI</b><span class="metric">38</span><br>Tracked household items</button>
+    <button class="tile" data-action="Grocery"><b>Grocery Shopping</b><span class="metric">12</span><br>Items ready for cart</button>
+    <button class="tile" data-action="Delivery"><b>Delivery Service</b><span class="metric">3</span><br>Orders in progress</button>
+    <button class="tile" data-action="Professionals"><b>Professional Network</b><span class="metric">6</span><br>Connected providers</button>
+    <button class="tile" data-action="Training"><b>Training Engine</b><span class="metric">220</span><br>Programs available</button>
+  </div>
+  <div id="notice" class="notice">Tap any module to test its administrator action.</div>
+</section>
+<script>
+const ADMIN_EMAIL='admin@project220.app';
+const ADMIN_PASSWORD='Project220Admin!';
+const login=document.getElementById('login');
+const admin=document.getElementById('admin');
+const email=document.getElementById('email');
+const password=document.getElementById('password');
+const error=document.getElementById('error');
+function showLogin(){admin.classList.add('hidden');login.classList.remove('hidden');password.value=ADMIN_PASSWORD;error.style.display='none';}
+function signIn(){if(email.value.trim().toLowerCase()===ADMIN_EMAIL&&password.value===ADMIN_PASSWORD){login.classList.add('hidden');admin.classList.remove('hidden');error.style.display='none';}else{error.style.display='block';}}
+document.getElementById('loginButton').addEventListener('click',signIn);
+document.getElementById('resetButton').addEventListener('click',()=>{email.value=ADMIN_EMAIL;password.value=ADMIN_PASSWORD;error.style.display='none';});
+document.getElementById('logoutButton').addEventListener('click',showLogin);
+document.querySelectorAll('[data-action]').forEach(btn=>btn.addEventListener('click',()=>{document.getElementById('notice').textContent=btn.dataset.action+' administrator module is responding in this prototype.';}));
+</script>
+</body>
+</html>
