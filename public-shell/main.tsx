@@ -1,11 +1,11 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import Home from "../app/page";
+import Project220AlphaApp from "./project220-alpha-app";
 import "../app/globals.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <Home />
+    <Project220AlphaApp />
   </React.StrictMode>,
 );
 
