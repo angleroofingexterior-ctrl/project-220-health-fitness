@@ -1,0 +1,55 @@
+name: Project 220 v0.3 Alpha Release
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - release/project220-v03-alpha
+
+permissions:
+  contents: read
+
+jobs:
+  build-pwa:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Project 220 Alpha PWA
+        run: npm run build:public
+
+      - name: Verify output
+        run: |
+          test -f public-pages/index.html
+          test -f public-pages/manifest.webmanifest
+          test -f public-pages/sw.js
+
+      - name: Add start instructions
+        run: |
+          cat > public-pages/START-HERE.txt <<'EOF'
+          PROJECT 220 VERSION 0.3 ALPHA
+
+          Master Admin test login:
+          Email: admin@project220.app
+          Password: Project220Admin!
+
+          Open the deployed app over HTTPS. The connected AI ecosystem runs in demo mode using synthetic data. Payment processing, retailer purchases, pharmacy pickup, live prices and live external AI providers are not activated.
+          EOF
+
+      - name: Upload downloadable PWA
+        uses: actions/upload-artifact@v4
+        with:
+          name: Project-220-Version-0.3-Alpha-PWA
+          path: public-pages/
+          if-no-files-found: error
+          retention-days: 30
