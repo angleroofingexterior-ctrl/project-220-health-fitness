@@ -1,11 +1,11 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import Project220AlphaApp from "./project220-alpha-app";
+import Project220ConnectedAiDemo from "./project220-connected-ai-demo";
 import "../app/globals.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <Project220AlphaApp />
+    <Project220ConnectedAiDemo />
   </React.StrictMode>,
 );
 
