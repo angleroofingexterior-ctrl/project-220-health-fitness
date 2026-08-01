@@ -1,0 +1,37 @@
+name: Project 220 Sprint 3 Marketplace
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - sprint-3-marketplace-delivery
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Build Sprint 3 Alpha
+        run: npm run build:public
+      - name: Verify marketplace features
+        run: |
+          test -f public-pages/index.html
+          grep -R "Sprint 3 Marketplace" public-pages
+          grep -R "Driver Food-Safety Dashboard" public-pages
+          grep -R "Unified Shopping Cart" public-pages
+      - name: Upload Sprint 3 Alpha
+        uses: actions/upload-artifact@v4
+        with:
+          name: Project-220-Sprint-3-Marketplace-Delivery-Alpha
+          path: public-pages/
+          if-no-files-found: error
+          retention-days: 30
