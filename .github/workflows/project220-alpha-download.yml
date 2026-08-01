@@ -1,0 +1,57 @@
+name: Project 220 0.3 Alpha Download
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feature/master-admin-ai-demo
+
+permissions:
+  contents: read
+
+jobs:
+  build-pwa:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Project 220 Alpha PWA
+        run: npm run build:public
+
+      - name: Verify output
+        run: |
+          test -f public-pages/index.html
+          test -f public-pages/manifest.webmanifest
+          test -f public-pages/sw.js
+
+      - name: Add testing instructions
+        run: |
+          cat > public-pages/START-HERE.txt <<'EOF'
+          PROJECT 220 VERSION 0.3 ALPHA
+
+          Master Admin test login:
+          Email: admin@project220.app
+          Password: Project220Admin!
+
+          This Alpha contains functional local-device workflows for the Project 220 modules. Features requiring external AI, retailer, pharmacy, payment, map, notification, cloud authentication, barcode, nutrition, or private-storage providers run in local test/simulation mode until corporation-owned provider accounts and credentials are connected.
+
+          To test as a web app, deploy the contents of this folder to an HTTPS static host. Opening index.html directly from a ZIP may not support all browser features.
+          EOF
+
+      - name: Upload downloadable PWA
+        uses: actions/upload-artifact@v4
+        with:
+          name: Project-220-Version-0.3-Alpha-PWA
+          path: public-pages/
+          if-no-files-found: error
+          retention-days: 30
