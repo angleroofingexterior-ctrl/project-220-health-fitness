@@ -1,0 +1,38 @@
+name: Project 220 Sprint 2 Connected AI
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - sprint-2-connected-ai
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Build Sprint 2 Alpha
+        run: npm run build:public
+      - name: Verify connected AI modules
+        run: |
+          test -f public-pages/index.html
+          grep -R "Sprint 2 Connected AI Alpha" public-pages
+          grep -R "Run Full AI Ecosystem" public-pages
+          grep -R "Pregnancy" public-pages
+          grep -R "Smart Basket Optimizer" public-pages
+      - name: Upload Sprint 2 Alpha
+        uses: actions/upload-artifact@v4
+        with:
+          name: Project-220-Sprint-2-Connected-AI-Alpha
+          path: public-pages/
+          if-no-files-found: error
+          retention-days: 30
