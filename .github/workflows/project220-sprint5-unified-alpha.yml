@@ -1,0 +1,79 @@
+name: Project 220 Sprint 5 Unified Alpha
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - sprint-5-unified-alpha-release
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: project220-sprint5-pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Build unified Alpha
+        run: npm run build:public
+
+      - name: Verify required modules
+        run: |
+          test -f public-pages/index.html
+          test -f public-pages/manifest.webmanifest
+          test -f public-pages/sw.js
+          grep -Rqi "Master Admin" public-pages
+          grep -Rqi "Pantry" public-pages
+          grep -Rqi "Coach" public-pages
+          grep -Rqi "Marketplace" public-pages
+          grep -Rqi "Pharmacy" public-pages
+          grep -Rqi "Privacy" public-pages
+
+      - name: Add tester instructions
+        run: |
+          cp docs/SPRINT5_ALPHA_TEST_GUIDE.md public-pages/START-HERE.md
+          echo "sprint5-$(date -u +%Y%m%d%H%M%S)" > public-pages/BUILD-VERSION.txt
+
+      - name: Upload downloadable Alpha
+        uses: actions/upload-artifact@v4
+        with:
+          name: Project-220-Sprint-5-Unified-Alpha
+          path: public-pages/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public-pages
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy unified Alpha
+        id: deployment
+        uses: actions/deploy-pages@v4
