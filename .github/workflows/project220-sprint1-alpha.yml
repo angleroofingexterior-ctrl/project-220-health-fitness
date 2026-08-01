@@ -1,0 +1,47 @@
+name: Project 220 Sprint 1 Alpha
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - sprint-1-foundation
+
+permissions:
+  contents: read
+
+jobs:
+  verify-sprint1:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Build Sprint 1 Alpha
+        run: npm run build:public
+
+      - name: Verify unified role shell
+        run: |
+          test -f public-pages/index.html
+          grep -R "Sprint 1 Foundation Alpha" public-pages
+          grep -R "Master Admin" public-pages
+          grep -R "Subscriber" public-pages
+          grep -R "Shopper" public-pages
+          grep -R "Driver" public-pages
+          grep -R "Coach" public-pages
+
+      - name: Upload Sprint 1 test build
+        uses: actions/upload-artifact@v4
+        with:
+          name: Project-220-Sprint-1-Foundation-Alpha
+          path: public-pages/
+          if-no-files-found: error
+          retention-days: 30
