@@ -1,11 +1,11 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import Project220Sprint3Marketplace from "./project220-sprint3-marketplace";
+import Project220Sprint4Premium from "./project220-sprint4-premium";
 import "../app/globals.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <Project220Sprint3Marketplace />
+    <Project220Sprint4Premium />
   </React.StrictMode>,
 );
 
