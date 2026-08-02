@@ -4,33 +4,49 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#7e1715"><title>Project 220 Functional Alpha</title>
 <style>
-*{box-sizing:border-box}body{margin:0;background:#090909;color:#fff;font-family:Arial,sans-serif}button,input{font:inherit}button{cursor:pointer}.wrap{max-width:1100px;margin:auto;padding:22px}.card{background:#171717;border:1px solid #333;border-radius:14px;padding:18px;margin:12px 0}.brand{font-size:28px;font-weight:900}.red{color:#ef4444}.muted{color:#bbb}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}.btn{border:1px solid #555;background:#292929;color:#fff;border-radius:10px;padding:12px}.btn.active,.primary{background:#b91c1c;border-color:#ef4444}.primary{color:white;border:0;border-radius:10px;padding:13px 16px;font-weight:700}.login{max-width:560px;margin:45px auto}.login label{display:grid;gap:6px;margin:12px 0}.login input{padding:12px;border-radius:9px;border:1px solid #555;background:#111;color:#fff}.nav{display:flex;gap:8px;overflow:auto;padding:10px 0}.row{display:flex;justify-content:space-between;gap:12px;align-items:center}.hidden{display:none}.status{background:#17202a;border-left:5px solid #22c55e;padding:13px;border-radius:8px}.log{max-height:220px;overflow:auto}.module button{width:100%;margin-top:10px}.check{display:block;padding:8px 0}.pill{display:inline-block;background:#333;border-radius:100px;padding:5px 10px;font-size:12px}
+*{box-sizing:border-box}body{margin:0;background:#090909;color:#fff;font-family:Arial,sans-serif}button,input{font:inherit}button{cursor:pointer;touch-action:manipulation}.wrap{max-width:1100px;margin:auto;padding:22px}.card{background:#171717;border:1px solid #333;border-radius:14px;padding:18px;margin:12px 0}.brand{font-size:28px;font-weight:900}.red{color:#ef4444}.muted{color:#bbb}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}.btn{border:1px solid #555;background:#292929;color:#fff;border-radius:10px;padding:12px}.btn.active,.primary{background:#b91c1c;border-color:#ef4444}.primary{color:white;border:0;border-radius:10px;padding:13px 16px;font-weight:700}.login{max-width:560px;margin:45px auto}.login label{display:grid;gap:6px;margin:12px 0}.login input{padding:12px;border-radius:9px;border:1px solid #555;background:#111;color:#fff}.nav{display:flex;gap:8px;overflow:auto;padding:10px 0}.row{display:flex;justify-content:space-between;gap:12px;align-items:center}.hidden{display:none}.status{background:#17202a;border-left:5px solid #22c55e;padding:13px;border-radius:8px}.log{max-height:220px;overflow:auto}.module button{width:100%;margin-top:10px}.check{display:block;padding:8px 0}.pill{display:inline-block;background:#333;border-radius:100px;padding:5px 10px;font-size:12px}
 </style>
 </head>
 <body>
-<div id="login" class="wrap login">
+<div id="loading" class="wrap login"><div class="brand">PROJECT <span class="red">220</span></div><h1>Preparing fresh test build…</h1><p class="muted">Clearing the old cached version from this device.</p></div>
+<div id="login" class="wrap login hidden">
  <div class="brand">PROJECT <span class="red">220</span></div>
  <h1>Functional Testing Alpha</h1>
  <p class="muted">Choose an account, then sign in.</p>
  <div class="grid">
-  <button class="btn" onclick="choose('admin')">Master Admin</button>
-  <button class="btn" onclick="choose('marcel')">Marcel Goulet — User</button>
+  <button class="btn" data-account="admin">Master Admin</button>
+  <button class="btn" data-account="marcel">Marcel Goulet — User</button>
  </div>
  <label>Email<input id="email" value="admin@project220.app"></label>
  <label>Password<input id="password" type="password" value="Project220Admin!"></label>
- <button class="primary" style="width:100%" onclick="login()">Sign in</button>
+ <button id="signin" class="primary" style="width:100%">Sign in</button>
  <p id="error" class="red"></p>
 </div>
 
 <div id="app" class="wrap hidden">
- <div class="row"><div><div class="brand">PROJECT <span class="red">220</span></div><span id="role" class="pill"></span></div><button class="btn" onclick="logout()">Log out</button></div>
- <div class="status"><b>Functional Alpha:</b> every button on this page uses built-in JavaScript and should respond immediately.</div>
+ <div class="row"><div><div class="brand">PROJECT <span class="red">220</span></div><span id="role" class="pill"></span></div><button id="logout" class="btn">Log out</button></div>
+ <div class="status"><b>Functional Alpha:</b> every module button is wired through JavaScript and should respond immediately.</div>
  <div id="nav" class="nav"></div>
  <section id="content" class="card"></section>
  <section class="card"><h2>Activity log</h2><div id="log" class="log muted">No actions yet.</div></section>
 </div>
 
 <script>
+(async function prepareFreshBuild(){
+  try {
+    if('serviceWorker' in navigator){
+      const registrations=await navigator.serviceWorker.getRegistrations();
+      await Promise.all(registrations.map(r=>r.unregister()));
+    }
+    if('caches' in window){
+      const keys=await caches.keys();
+      await Promise.all(keys.map(k=>caches.delete(k)));
+    }
+  } catch(e) { console.warn('Cache cleanup warning',e); }
+  document.getElementById('loading').classList.add('hidden');
+  document.getElementById('login').classList.remove('hidden');
+})();
+
 const accounts={
  admin:{name:'Master Admin',email:'admin@project220.app',password:'Project220Admin!',role:'admin'},
  marcel:{name:'Marcel Goulet',email:'marcel.goulet@project220.app',password:'Project220User!',role:'user'}
@@ -57,15 +73,30 @@ function login(){
  if(!current){document.getElementById('error').textContent='Incorrect test login.';return}
  document.getElementById('login').classList.add('hidden');document.getElementById('app').classList.remove('hidden');
  document.getElementById('role').textContent=current.name+' · '+(current.role==='admin'?'Master Admin':'Subscriber User');
- events=[];record(current.name+' signed in.');renderNav();openModule('Dashboard');
+ events=[];record(current.name+' signed in.');active='Dashboard';renderNav();openModule('Dashboard');
 }
 function logout(){current=null;document.getElementById('app').classList.add('hidden');document.getElementById('login').classList.remove('hidden')}
 function allowed(){return current.role==='admin'?Object.keys(modules):Object.keys(modules).filter(x=>x!=='Admin')}
-function renderNav(){document.getElementById('nav').innerHTML=allowed().map(n=>`<button class="btn ${n===active?'active':''}" onclick="openModule('${n.replace(/'/g,"\\'")}')">${n}</button>`).join('')}
-function openModule(name){active=name;renderNav();const m=modules[name];document.getElementById('content').innerHTML=`<h1>${name}</h1><p class="muted">${m.summary}</p><div class="grid">${m.actions.map(a=>`<div class="card module"><b>${a}</b><button class="primary" onclick="runAction('${a.replace(/'/g,"\\'")}')">Run</button></div>`).join('')}</div>${name==='Shopper & Driver'?safetyChecks():''}`}
-function safetyChecks(){return `<div class="card"><h3>Food safety checklist</h3>${['Clean hands or gloves','Produce bagged and labelled','Cold and frozen items separated','Raw foods separated','Photo evidence recorded'].map(x=>`<label class="check"><input type="checkbox" onchange="record('${x} updated')"> ${x}</label>`).join('')}</div>`}
-function runAction(a){record(a+' completed in demo mode.');alert(a+'\n\nDemo action completed successfully.')}
-function record(msg){events.unshift(new Date().toLocaleTimeString()+' — '+msg);document.getElementById('log').innerHTML=events.map(x=>`<div>${x}</div>`).join('')}
+function renderNav(){
+ const nav=document.getElementById('nav');nav.innerHTML='';
+ allowed().forEach(name=>{const b=document.createElement('button');b.className='btn'+(name===active?' active':'');b.textContent=name;b.addEventListener('click',()=>openModule(name));nav.appendChild(b)});
+}
+function openModule(name){
+ active=name;renderNav();const m=modules[name];const content=document.getElementById('content');content.innerHTML='';
+ const h=document.createElement('h1');h.textContent=name;content.appendChild(h);
+ const p=document.createElement('p');p.className='muted';p.textContent=m.summary;content.appendChild(p);
+ const grid=document.createElement('div');grid.className='grid';
+ m.actions.forEach(action=>{const card=document.createElement('div');card.className='card module';const strong=document.createElement('b');strong.textContent=action;const button=document.createElement('button');button.className='primary';button.textContent='Run';button.addEventListener('click',()=>runAction(action));card.append(strong,button);grid.appendChild(card)});
+ content.appendChild(grid);
+ if(name==='Shopper & Driver')content.appendChild(safetyChecks());
+}
+function safetyChecks(){const box=document.createElement('div');box.className='card';box.innerHTML='<h3>Food safety checklist</h3>';['Clean hands or gloves','Produce bagged and labelled','Cold and frozen items separated','Raw foods separated','Photo evidence recorded'].forEach(label=>{const row=document.createElement('label');row.className='check';const input=document.createElement('input');input.type='checkbox';input.addEventListener('change',()=>record(label+' updated'));row.append(input,document.createTextNode(' '+label));box.appendChild(row)});return box}
+function runAction(a){record(a+' completed in demo mode.');document.getElementById('content').insertAdjacentHTML('afterbegin','<div class="status"><b>Completed:</b> '+a+'</div>')}
+function record(msg){events.unshift(new Date().toLocaleTimeString()+' — '+msg);document.getElementById('log').innerHTML=events.map(x=>'<div>'+x+'</div>').join('')}
+
+document.querySelectorAll('[data-account]').forEach(b=>b.addEventListener('click',()=>choose(b.dataset.account)));
+document.getElementById('signin').addEventListener('click',login);
+document.getElementById('logout').addEventListener('click',logout);
 </script>
 </body>
 </html>
