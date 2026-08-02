@@ -1,11 +1,11 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import Project220Sprint4Premium from "./project220-sprint4-premium";
+import Project220Sprint5Functional from "./project220-sprint5-functional";
 import "../app/globals.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <Project220Sprint4Premium />
+    <Project220Sprint5Functional />
   </React.StrictMode>,
 );
 
