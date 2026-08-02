@@ -1,21 +1,71 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#7e1715" />
-    <meta name="description" content="Created and owned by Marcel Joseph Goulet. Generate personal workouts, meal plans, measured recipes, grocery lists, supplement education, routines, reminders, and progress logs." />
-    <meta name="author" content="Marcel Joseph Goulet" />
-    <meta property="og:title" content="Project 220 Health & Fitness" />
-    <meta property="og:description" content="Personal workouts, meal planning, automatic grocery lists, and progress tracking." />
-    <meta property="og:image" content="./og.png" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <link rel="manifest" href="./manifest.webmanifest" />
-    <link rel="apple-touch-icon" href="./icon.svg" />
-    <title>Project 220 Health & Fitness</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/main.tsx"></script>
-  </body>
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#7e1715"><title>Project 220 Functional Alpha</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#090909;color:#fff;font-family:Arial,sans-serif}button,input{font:inherit}button{cursor:pointer}.wrap{max-width:1100px;margin:auto;padding:22px}.card{background:#171717;border:1px solid #333;border-radius:14px;padding:18px;margin:12px 0}.brand{font-size:28px;font-weight:900}.red{color:#ef4444}.muted{color:#bbb}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}.btn{border:1px solid #555;background:#292929;color:#fff;border-radius:10px;padding:12px}.btn.active,.primary{background:#b91c1c;border-color:#ef4444}.primary{color:white;border:0;border-radius:10px;padding:13px 16px;font-weight:700}.login{max-width:560px;margin:45px auto}.login label{display:grid;gap:6px;margin:12px 0}.login input{padding:12px;border-radius:9px;border:1px solid #555;background:#111;color:#fff}.nav{display:flex;gap:8px;overflow:auto;padding:10px 0}.row{display:flex;justify-content:space-between;gap:12px;align-items:center}.hidden{display:none}.status{background:#17202a;border-left:5px solid #22c55e;padding:13px;border-radius:8px}.log{max-height:220px;overflow:auto}.module button{width:100%;margin-top:10px}.check{display:block;padding:8px 0}.pill{display:inline-block;background:#333;border-radius:100px;padding:5px 10px;font-size:12px}
+</style>
+</head>
+<body>
+<div id="login" class="wrap login">
+ <div class="brand">PROJECT <span class="red">220</span></div>
+ <h1>Functional Testing Alpha</h1>
+ <p class="muted">Choose an account, then sign in.</p>
+ <div class="grid">
+  <button class="btn" onclick="choose('admin')">Master Admin</button>
+  <button class="btn" onclick="choose('marcel')">Marcel Goulet — User</button>
+ </div>
+ <label>Email<input id="email" value="admin@project220.app"></label>
+ <label>Password<input id="password" type="password" value="Project220Admin!"></label>
+ <button class="primary" style="width:100%" onclick="login()">Sign in</button>
+ <p id="error" class="red"></p>
+</div>
+
+<div id="app" class="wrap hidden">
+ <div class="row"><div><div class="brand">PROJECT <span class="red">220</span></div><span id="role" class="pill"></span></div><button class="btn" onclick="logout()">Log out</button></div>
+ <div class="status"><b>Functional Alpha:</b> every button on this page uses built-in JavaScript and should respond immediately.</div>
+ <div id="nav" class="nav"></div>
+ <section id="content" class="card"></section>
+ <section class="card"><h2>Activity log</h2><div id="log" class="log muted">No actions yet.</div></section>
+</div>
+
+<script>
+const accounts={
+ admin:{name:'Master Admin',email:'admin@project220.app',password:'Project220Admin!',role:'admin'},
+ marcel:{name:'Marcel Goulet',email:'marcel.goulet@project220.app',password:'Project220User!',role:'user'}
+};
+const modules={
+ Dashboard:{summary:'Project 220 command centre and full demo status.',actions:['Run Full AI Ecosystem Demo','Refresh dashboard']},
+ 'Pantry AI':{summary:'Simulated pantry photo, receipt and barcode processing.',actions:['Scan demo pantry','Process demo receipt','Scan demo barcode']},
+ Nutrition:{summary:'Universal nutrition planning with pregnancy and life-stage options.',actions:['Generate Marcel nutrition plan','Generate pregnancy-safe demo plan','Calculate supplement quantities']},
+ Cookbook:{summary:'Private in-app recipes, family meals, kid-friendly snacks and bulk cooking.',actions:['Generate private cookbook','Create yogurt snack plan','Create kid-friendly meal set']},
+ 'AI Coach':{summary:'General wellness coaching with selectable intensity.',actions:['Supportive coach message','Focused coach message','Elite coach message']},
+ 'Basket Optimizer':{summary:'Cost, nutrition, supplement, budget, recipe and waste optimization.',actions:['Optimize demo basket','Find cheapest basket','Reduce food waste']},
+ Marketplace:{summary:'Simulated grocery, supplement, restaurant and pharmacy marketplace.',actions:['Create demo order','Request substitution approval','Compare demo retailers']},
+ 'Shopper & Driver':{summary:'Item checklist, customer communication and food-safety evidence.',actions:['Open shopper checklist','Open driver checklist','Send customer update']},
+ Pharmacy:{summary:'Simulation-only identity, seal and handoff chain of custody.',actions:['Record identity check','Confirm sealed package','Record handoff']},
+ Coaches:{summary:'Professional coach discovery and appointment request simulation.',actions:['View verified coaches','Request demo appointment']},
+ Privacy:{summary:'Admin sees operations only. User health, pantry, photos and coaching remain private.',actions:['Run privacy check']},
+ Admin:{summary:'Operational analytics, feature flags and service readiness.',actions:['Open analytics','Run system health check','Toggle demo feature flag']}
+};
+let current=null,active='Dashboard',events=[];
+function choose(key){document.getElementById('email').value=accounts[key].email;document.getElementById('password').value=accounts[key].password}
+function login(){
+ const e=document.getElementById('email').value.trim().toLowerCase(),p=document.getElementById('password').value;
+ current=Object.values(accounts).find(a=>a.email===e&&a.password===p);
+ if(!current){document.getElementById('error').textContent='Incorrect test login.';return}
+ document.getElementById('login').classList.add('hidden');document.getElementById('app').classList.remove('hidden');
+ document.getElementById('role').textContent=current.name+' · '+(current.role==='admin'?'Master Admin':'Subscriber User');
+ events=[];record(current.name+' signed in.');renderNav();openModule('Dashboard');
+}
+function logout(){current=null;document.getElementById('app').classList.add('hidden');document.getElementById('login').classList.remove('hidden')}
+function allowed(){return current.role==='admin'?Object.keys(modules):Object.keys(modules).filter(x=>x!=='Admin')}
+function renderNav(){document.getElementById('nav').innerHTML=allowed().map(n=>`<button class="btn ${n===active?'active':''}" onclick="openModule('${n.replace(/'/g,"\\'")}')">${n}</button>`).join('')}
+function openModule(name){active=name;renderNav();const m=modules[name];document.getElementById('content').innerHTML=`<h1>${name}</h1><p class="muted">${m.summary}</p><div class="grid">${m.actions.map(a=>`<div class="card module"><b>${a}</b><button class="primary" onclick="runAction('${a.replace(/'/g,"\\'")}')">Run</button></div>`).join('')}</div>${name==='Shopper & Driver'?safetyChecks():''}`}
+function safetyChecks(){return `<div class="card"><h3>Food safety checklist</h3>${['Clean hands or gloves','Produce bagged and labelled','Cold and frozen items separated','Raw foods separated','Photo evidence recorded'].map(x=>`<label class="check"><input type="checkbox" onchange="record('${x} updated')"> ${x}</label>`).join('')}</div>`}
+function runAction(a){record(a+' completed in demo mode.');alert(a+'\n\nDemo action completed successfully.')}
+function record(msg){events.unshift(new Date().toLocaleTimeString()+' — '+msg);document.getElementById('log').innerHTML=events.map(x=>`<div>${x}</div>`).join('')}
+</script>
+</body>
 </html>
